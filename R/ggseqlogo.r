@@ -163,24 +163,44 @@ geom_logo <- function(data = NULL, method='bits', seq_type='auto', namespace=NUL
   
   # Convert character seqs to list
   if(is.character(data) | is.matrix(data)) data = list("1"=data)
-  
-  if(is.list(data)){
-    # Set names for list if they dont exist
-    if(is.null(names(data))) names(data) = seq_along(data)
-    
-    lvls = names(data)
-    
+
+  # Add compatibility support for dataframe as input (code by @soumitrakp)
+  if (is.data.frame(data)) {
+    if(is.null(row.names(data))) row.names(data) = seq_len(nrow(data))
+    lvls <- row.names(data)
+
     # We have list of sequences - loop and rbind
-    data_sp = lapply(names(data), function(n){
-      curr_seqs = data[[n]]
+    data_sp = lapply(seq_len(nrow(data)), function(n){
+      curr_seqs = data$data[[n]]
       logo_data(seqs = curr_seqs, method = method, stack_width = stack_width, 
-                rev_stack_order = rev_stack_order, seq_group = n, seq_type = seq_type, 
+                rev_stack_order = rev_stack_order, seq_group = lvls[[n]], seq_type = seq_type, 
                 font = font, namespace=namespace)
     })
-    data = do.call(rbind, data_sp)
-    # Set factor for order of facet
+
+    data$data <- NULL
+    data$seq_group <- NULL
+
+    data = merge(do.call(rbind, data_sp), data, by.y="row.names", by.x="seq_group")
+
     data$seq_group = factor(data$seq_group, levels = lvls)
-  }
+
+    } else if(is.list(data)){
+      # Set names for list if they dont exist
+      if(is.null(names(data))) names(data) = seq_along(data)
+    
+      lvls = names(data)
+    
+      # We have list of sequences - loop and rbind
+      data_sp = lapply(names(data), function(n){
+        curr_seqs = data[[n]]
+        logo_data(seqs = curr_seqs, method = method, stack_width = stack_width, 
+                rev_stack_order = rev_stack_order, seq_group = n, seq_type = seq_type, 
+                font = font, namespace=namespace)
+      })
+      data = do.call(rbind, data_sp)
+      # Set factor for order of facet
+      data$seq_group = factor(data$seq_group, levels = lvls)
+    }
   
   if(!plot) return(data)
   
@@ -214,7 +234,7 @@ geom_logo <- function(data = NULL, method='bits', seq_type='auto', namespace=NUL
   
   # If letters and group are the same, don't draw legend
   guides_opts = NULL
-  if(identical(cs$letter, cs$group)) guides_opts = guides(fill=F)
+  if(identical(cs$letter, cs$group)) guides_opts = guides(fill="none")
   
   y_lim = NULL
   extra_opts = NULL
